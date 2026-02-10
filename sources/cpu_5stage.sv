@@ -44,7 +44,7 @@ module cpu_5stage (
     /* ---------------- FETCH ---------------- */
     always_ff @(posedge clk) begin
         if (rst) begin
-            pc <= 32'd0;
+            pc          <= 32'd0;
             ifid_instr <= 32'd0;
             ifid_pc    <= 32'd0;
         end else begin
@@ -104,6 +104,9 @@ module cpu_5stage (
             memwb_op  <= OP_NOP;
             memwb_rd  <= 3'd0;
             memwb_val <= 32'd0;
+
+            for (i = 0; i < 256; i = i + 1)
+                dmem[i] <= 32'd0;
         end else begin
             memwb_op <= exmem_op;
             memwb_rd <= exmem_rd;
@@ -119,14 +122,21 @@ module cpu_5stage (
         end
     end
 
-    /* ---------------- WRITEBACK ---------------- */
+    /* ---------------- WRITEBACK + REGFILE RESET ---------------- */
     always_ff @(posedge clk) begin
-        if (!rst &&
-            memwb_rd != 3'd0 &&
-            (memwb_op == OP_ADD ||
-             memwb_op == OP_SUB ||
-             memwb_op == OP_LW)) begin
-            regfile[memwb_rd] <= memwb_val;
+        if (rst) begin
+            for (i = 0; i < 8; i = i + 1)
+                regfile[i] <= 32'd0;
+        end else begin
+            /* R0 stays zero */
+            regfile[0] <= 32'd0;
+
+            if (memwb_rd != 3'd0 &&
+                (memwb_op == OP_ADD ||
+                 memwb_op == OP_SUB ||
+                 memwb_op == OP_LW)) begin
+                regfile[memwb_rd] <= memwb_val;
+            end
         end
     end
 
