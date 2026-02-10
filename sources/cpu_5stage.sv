@@ -1,147 +1,134 @@
 `timescale 1ns/1ps
 module cpu_5stage (
-    input  logic clk,
-    input  logic rst
+    input  wire        clk,
+    input  wire        reset
 );
 
-    /* ---------------- OPCODES ---------------- */
-    localparam OP_ADD = 3'b000;
-    localparam OP_SUB = 3'b001;
-    localparam OP_LW  = 3'b010;
-    localparam OP_SW  = 3'b011;
-    localparam OP_BEQ = 3'b100;
-    localparam OP_NOP = 3'b111;
+    // -----------------------------
+    // Instruction memory (simple ROM)
+    // -----------------------------
+    reg [31:0] imem [0:255];
+    initial $readmemh("program.hex", imem);
 
-    /* ---------------- STATE ---------------- */
-    logic [31:0] pc;
-    logic        started;
-    logic [31:0] imem [0:255];
-    logic [31:0] dmem [0:255];
-    logic [31:0] regfile [0:7];
-
-    /* ---------------- IF / ID ---------------- */
-    logic [31:0] ifid_instr;
-    logic [31:0] ifid_pc;
-
-    /* ---------------- ID / EX ---------------- */
-    logic [2:0]  idex_op;
-    logic [2:0]  idex_rd, idex_rs1, idex_rs2;
-    logic [31:0] idex_imm;
-    logic [31:0] idex_a, idex_b;
-
-    /* ---------------- EX / MEM ---------------- */
-    logic [2:0]  exmem_op;
-    logic [2:0]  exmem_rd;
-    logic [31:0] exmem_alu;
-    logic [31:0] exmem_b;
-
-    /* ---------------- MEM / WB ---------------- */
-    logic [2:0]  memwb_op;
-    logic [2:0]  memwb_rd;
-    logic [31:0] memwb_val;
+    // -----------------------------
+    // Register file
+    // -----------------------------
+    reg [31:0] regfile [0:31];
 
     integer i;
-
-    /* ---------------- FETCH ---------------- */
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            pc          <= 32'd0;
-            started     <= 1'b0;
-            ifid_instr  <= 32'd0; // NOP
-            ifid_pc     <= 32'd0;
-        end else begin
-            if (!started) begin
-                // wait one clean cycle after reset
-                started    <= 1'b1;
-                ifid_instr <= 32'd0; // NOP
-            end else begin
-                ifid_instr <= imem[pc[9:2]];
-                ifid_pc    <= pc;
-                pc         <= pc + 4;
-            end
-        end
-    end
-
-    /* ---------------- DECODE ---------------- */
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            idex_op  <= OP_NOP;
-            idex_rd  <= 3'd0;
-            idex_rs1 <= 3'd0;
-            idex_rs2 <= 3'd0;
-            idex_imm <= 32'd0;
-            idex_a   <= 32'd0;
-            idex_b   <= 32'd0;
-        end else begin
-            idex_op  <= ifid_instr[31:29];
-            idex_rd  <= ifid_instr[28:26];
-            idex_rs1 <= ifid_instr[25:23];
-            idex_rs2 <= ifid_instr[22:20];
-            idex_imm <= {{20{ifid_instr[19]}}, ifid_instr[19:0]};
-            idex_a   <= regfile[ifid_instr[25:23]];
-            idex_b   <= regfile[ifid_instr[22:20]];
-        end
-    end
-
-    /* ---------------- EXECUTE ---------------- */
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            exmem_op  <= OP_NOP;
-            exmem_rd  <= 3'd0;
-            exmem_alu <= 32'd0;
-            exmem_b   <= 32'd0;
-        end else begin
-            exmem_op <= idex_op;
-            exmem_rd <= idex_rd;
-            exmem_b  <= idex_b;
-
-            case (idex_op)
-                OP_ADD: exmem_alu <= idex_a + idex_b + idex_imm;
-                OP_SUB: exmem_alu <= idex_a - idex_b;
-                OP_LW,
-                OP_SW : exmem_alu <= idex_a + idex_imm;
-                OP_BEQ: exmem_alu <= (idex_a == idex_b);
-                default: exmem_alu <= 32'd0;
-            endcase
-        end
-    end
-
-    /* ---------------- MEMORY ---------------- */
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            memwb_op  <= OP_NOP;
-            memwb_rd  <= 3'd0;
-            memwb_val <= 32'd0;
-            for (i = 0; i < 256; i = i + 1)
-                dmem[i] <= 32'd0;
-        end else begin
-            memwb_op <= exmem_op;
-            memwb_rd <= exmem_rd;
-
-            case (exmem_op)
-                OP_LW: memwb_val <= dmem[exmem_alu[9:2]];
-                OP_SW: begin
-                    dmem[exmem_alu[9:2]] <= exmem_b;
-                    memwb_val <= 32'd0;
-                end
-                default: memwb_val <= exmem_alu;
-            endcase
-        end
-    end
-
-    /* ---------------- WRITEBACK ---------------- */
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            for (i = 0; i < 8; i = i + 1)
+    always @(posedge clk) begin
+        if (reset) begin
+            for (i = 0; i < 32; i = i + 1)
                 regfile[i] <= 32'd0;
+        end
+    end
+
+    // -----------------------------
+    // Program Counter
+    // -----------------------------
+    reg [31:0] pc;
+    always @(posedge clk) begin
+        if (reset)
+            pc <= 32'd0;
+        else
+            pc <= pc + 4;
+    end
+
+    // =============================
+    // PIPELINE REGISTERS
+    // =============================
+
+    // IF/ID
+    reg [31:0] if_id_instr;
+
+    // ID/EX
+    reg [31:0] id_ex_rs1_val, id_ex_rs2_val;
+    reg [4:0]  id_ex_rd;
+    reg [31:0] id_ex_imm;
+    reg        id_ex_is_addi;
+    reg        id_ex_regwrite;
+
+    // EX/MEM
+    reg [31:0] ex_mem_alu;
+    reg [4:0]  ex_mem_rd;
+    reg        ex_mem_regwrite;
+
+    // MEM/WB
+    reg [31:0] mem_wb_result;
+    reg [4:0]  mem_wb_rd;
+    reg        mem_wb_regwrite;
+
+    // =============================
+    // IF stage
+    // =============================
+    always @(posedge clk) begin
+        if (reset)
+            if_id_instr <= 32'd0;
+        else
+            if_id_instr <= imem[pc[9:2]];
+    end
+
+    // =============================
+    // ID stage
+    // =============================
+    wire [6:0] opcode = if_id_instr[6:0];
+    wire [4:0] rd     = if_id_instr[11:7];
+    wire [2:0] funct3 = if_id_instr[14:12];
+    wire [4:0] rs1    = if_id_instr[19:15];
+    wire [4:0] rs2    = if_id_instr[24:20];
+
+    wire is_add  = (opcode == 7'b0110011);
+    wire is_addi = (opcode == 7'b0010011);
+
+    wire [31:0] imm_i = {{20{if_id_instr[31]}}, if_id_instr[31:20]};
+
+    always @(posedge clk) begin
+        if (reset) begin
+            id_ex_regwrite <= 1'b0;
         end else begin
-            regfile[0] <= 32'd0;
-            if (memwb_rd != 3'd0 &&
-                (memwb_op == OP_ADD ||
-                 memwb_op == OP_SUB ||
-                 memwb_op == OP_LW)) begin
-                regfile[memwb_rd] <= memwb_val;
-            end
+            id_ex_rs1_val  <= regfile[rs1];
+            id_ex_rs2_val  <= regfile[rs2];
+            id_ex_rd       <= rd;
+            id_ex_imm      <= imm_i;
+            id_ex_is_addi  <= is_addi;
+            id_ex_regwrite <= is_add | is_addi;
+        end
+    end
+
+    // =============================
+    // EX stage
+    // =============================
+    always @(posedge clk) begin
+        if (reset) begin
+            ex_mem_regwrite <= 1'b0;
+        end else begin
+            ex_mem_alu <= id_ex_is_addi ?
+                          (id_ex_rs1_val + id_ex_imm) :
+                          (id_ex_rs1_val + id_ex_rs2_val);
+            ex_mem_rd       <= id_ex_rd;
+            ex_mem_regwrite <= id_ex_regwrite;
+        end
+    end
+
+    // =============================
+    // MEM stage (pass-through)
+    // =============================
+    always @(posedge clk) begin
+        if (reset) begin
+            mem_wb_regwrite <= 1'b0;
+        end else begin
+            mem_wb_result   <= ex_mem_alu;
+            mem_wb_rd       <= ex_mem_rd;
+            mem_wb_regwrite <= ex_mem_regwrite;
+        end
+    end
+
+    // =============================
+    // WB stage (THIS WAS THE BUG)
+    // =============================
+    always @(posedge clk) begin
+        if (!reset && mem_wb_regwrite && mem_wb_rd != 0) begin
+            regfile[mem_wb_rd] <= mem_wb_result;
         end
     end
 
