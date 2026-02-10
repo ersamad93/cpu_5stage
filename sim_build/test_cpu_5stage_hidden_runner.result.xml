@@ -1,8 +1,6 @@
 <testsuites name="results">
   <testsuite name="all" package="all">
-    <property name="random_seed" value="1770737437" />
-    <testcase name="test_cpu_exhaustive" classname="test_cpu_5stage_hidden" file="H:\ABDUS\verilog-coding-template\cpu_5stage\tests\test_cpu_5stage_hidden.py" lineno="36" time="0.015544652938842773" sim_time_ns="120.0" ratio_time="7719.69631436065">
-      <failure error_type="AssertionError" error_msg="R1 incorrect: 0&#10;assert 0 == 5&#10; +  where 0 = read_reg(HierarchyObject(cpu_5stage), 1)" />
-    </testcase>
+    <property name="random_seed" value="1770739057" />
+    <testcase name="test_cpu_forwarding" classname="test_cpu_5stage_hidden" file="H:\ABDUS\verilog-coding-template\cpu_5stage\tests\test_cpu_5stage_hidden.py" lineno="5" time="0.0" sim_time_ns="100.0" ratio_time="inf" />
   </testsuite>
 </testsuites>
