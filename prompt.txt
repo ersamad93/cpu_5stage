@@ -1,0 +1,12 @@
+Prompt: 5-Stage Pipelined RISC-V/MIPS Core Generation
+Objective: Generate a synthesizable Verilog implementation of a 5-stage pipelined CPU core.
+
+1. RTL Architecture Requirements:
+
+Pipeline Stages: Implement five distinct stages: IF (Instruction Fetch), ID (Instruction Decode), EX (Execute), MEM (Memory Access), and WB (Write Back).
+
+Interfaces: * Standard clk and rst inputs.
+
+			* Instruction memory interface (Program Counter Address out, Instruction in).
+
+			* Data memory interface (Address out, Write-Data out, Read-Data in, Write-Enable out).
