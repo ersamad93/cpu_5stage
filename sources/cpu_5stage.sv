@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 module cpu_5stage (
     input  wire        clk,
-    input  wire        reset
+    input  wire        rst
 );
 
     // -----------------------------
@@ -17,7 +17,7 @@ module cpu_5stage (
 
     integer i;
     always @(posedge clk) begin
-        if (reset) begin
+        if (rst) begin
             for (i = 0; i < 32; i = i + 1)
                 regfile[i] <= 32'd0;
         end
@@ -28,7 +28,7 @@ module cpu_5stage (
     // -----------------------------
     reg [31:0] pc;
     always @(posedge clk) begin
-        if (reset)
+        if (rst)
             pc <= 32'd0;
         else
             pc <= pc + 4;
@@ -62,7 +62,7 @@ module cpu_5stage (
     // IF stage
     // =============================
     always @(posedge clk) begin
-        if (reset)
+        if (rst)
             if_id_instr <= 32'd0;
         else
             if_id_instr <= imem[pc[9:2]];
@@ -83,7 +83,7 @@ module cpu_5stage (
     wire [31:0] imm_i = {{20{if_id_instr[31]}}, if_id_instr[31:20]};
 
     always @(posedge clk) begin
-        if (reset) begin
+        if (rst) begin
             id_ex_regwrite <= 1'b0;
         end else begin
             id_ex_rs1_val  <= regfile[rs1];
@@ -99,7 +99,7 @@ module cpu_5stage (
     // EX stage
     // =============================
     always @(posedge clk) begin
-        if (reset) begin
+        if (rst) begin
             ex_mem_regwrite <= 1'b0;
         end else begin
             ex_mem_alu <= id_ex_is_addi ?
@@ -114,7 +114,7 @@ module cpu_5stage (
     // MEM stage (pass-through)
     // =============================
     always @(posedge clk) begin
-        if (reset) begin
+        if (rst) begin
             mem_wb_regwrite <= 1'b0;
         end else begin
             mem_wb_result   <= ex_mem_alu;
@@ -127,7 +127,7 @@ module cpu_5stage (
     // WB stage (THIS WAS THE BUG)
     // =============================
     always @(posedge clk) begin
-        if (!reset && mem_wb_regwrite && mem_wb_rd != 0) begin
+        if (!rst && mem_wb_regwrite && mem_wb_rd != 0) begin
             regfile[mem_wb_rd] <= mem_wb_result;
         end
     end
