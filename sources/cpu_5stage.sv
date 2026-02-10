@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module cpu_5stage (
     input  logic clk,
     input  logic rst
