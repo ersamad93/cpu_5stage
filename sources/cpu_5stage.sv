@@ -14,6 +14,7 @@ module cpu_5stage (
 
     /* ---------------- STATE ---------------- */
     logic [31:0] pc;
+    logic        started;
     logic [31:0] imem [0:255];
     logic [31:0] dmem [0:255];
     logic [31:0] regfile [0:7];
@@ -45,12 +46,19 @@ module cpu_5stage (
     always_ff @(posedge clk) begin
         if (rst) begin
             pc          <= 32'd0;
-            ifid_instr <= 32'd0;
-            ifid_pc    <= 32'd0;
+            started     <= 1'b0;
+            ifid_instr  <= 32'd0; // NOP
+            ifid_pc     <= 32'd0;
         end else begin
-            ifid_instr <= imem[pc[9:2]];
-            ifid_pc    <= pc;
-            pc <= pc + 4;
+            if (!started) begin
+                // wait one clean cycle after reset
+                started    <= 1'b1;
+                ifid_instr <= 32'd0; // NOP
+            end else begin
+                ifid_instr <= imem[pc[9:2]];
+                ifid_pc    <= pc;
+                pc         <= pc + 4;
+            end
         end
     end
 
@@ -88,9 +96,7 @@ module cpu_5stage (
             exmem_b  <= idex_b;
 
             case (idex_op)
-                // ✅ FIX: ADD uses immediate
                 OP_ADD: exmem_alu <= idex_a + idex_b + idex_imm;
-
                 OP_SUB: exmem_alu <= idex_a - idex_b;
                 OP_LW,
                 OP_SW : exmem_alu <= idex_a + idex_imm;
@@ -106,7 +112,6 @@ module cpu_5stage (
             memwb_op  <= OP_NOP;
             memwb_rd  <= 3'd0;
             memwb_val <= 32'd0;
-
             for (i = 0; i < 256; i = i + 1)
                 dmem[i] <= 32'd0;
         end else begin
@@ -124,14 +129,13 @@ module cpu_5stage (
         end
     end
 
-    /* ---------------- WRITEBACK + RESET ---------------- */
+    /* ---------------- WRITEBACK ---------------- */
     always_ff @(posedge clk) begin
         if (rst) begin
             for (i = 0; i < 8; i = i + 1)
                 regfile[i] <= 32'd0;
         end else begin
-            regfile[0] <= 32'd0; // R0 hardwired
-
+            regfile[0] <= 32'd0;
             if (memwb_rd != 3'd0 &&
                 (memwb_op == OP_ADD ||
                  memwb_op == OP_SUB ||
