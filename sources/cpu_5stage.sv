@@ -88,7 +88,9 @@ module cpu_5stage (
             exmem_b  <= idex_b;
 
             case (idex_op)
-                OP_ADD: exmem_alu <= idex_a + idex_b;
+                // ✅ FIX: ADD uses immediate
+                OP_ADD: exmem_alu <= idex_a + idex_b + idex_imm;
+
                 OP_SUB: exmem_alu <= idex_a - idex_b;
                 OP_LW,
                 OP_SW : exmem_alu <= idex_a + idex_imm;
@@ -122,14 +124,13 @@ module cpu_5stage (
         end
     end
 
-    /* ---------------- WRITEBACK + REGFILE RESET ---------------- */
+    /* ---------------- WRITEBACK + RESET ---------------- */
     always_ff @(posedge clk) begin
         if (rst) begin
             for (i = 0; i < 8; i = i + 1)
                 regfile[i] <= 32'd0;
         end else begin
-            /* R0 stays zero */
-            regfile[0] <= 32'd0;
+            regfile[0] <= 32'd0; // R0 hardwired
 
             if (memwb_rd != 3'd0 &&
                 (memwb_op == OP_ADD ||
