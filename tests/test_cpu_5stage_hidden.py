@@ -98,3 +98,31 @@ async def test_cpu_exhaustive(dut):
     for i in range(32):
         assert read_reg(dut, i) == 0, f"Register R{i} not cleared on reset"
 
+    
+    
+
+# CRITICAL: Pytest wrapper function
+def test_cpu_5stage_hidden_runner():
+    import os
+    from pathlib import Path
+    from cocotb_tools.runner import get_runner
+    
+    sim = os.getenv("SIM", "icarus")
+    proj_path = Path(__file__).resolve().parent.parent
+    
+    sources = [
+        proj_path / "sources/cpu_5stage.sv",
+    ]
+    
+    runner = get_runner(sim)
+    runner.build(
+        sources=sources,
+        hdl_toplevel="cpu_5stage",
+        always=True,
+    )
+    
+    runner.test(
+        hdl_toplevel="cpu_5stage",
+        test_module="test_cpu_5stage_hidden"
+    )
+
