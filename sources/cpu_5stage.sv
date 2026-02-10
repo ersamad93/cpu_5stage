@@ -1,9 +1,7 @@
 `timescale 1ns/1ps
-`timescale 1ns/1ps
-
 module cpu_5stage (
     input  wire clk,
-    input  wire rst
+    input  wire reset
 );
 
     // -----------------------------
@@ -51,7 +49,7 @@ module cpu_5stage (
     integer i;
 
     always @(posedge clk) begin
-        if (rst) begin
+        if (reset) begin
             pc <= 0;
             for (i = 0; i < 32; i = i + 1)
                 regfile[i] <= 0;
