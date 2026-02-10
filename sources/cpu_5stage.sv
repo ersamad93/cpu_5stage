@@ -1,106 +1,83 @@
 `timescale 1ns/1ps
 module cpu_5stage (
-    input  wire clk,
-    input  wire reset
+    input wire clk,
+    input wire rst,
+    output reg [31:0] pc,
+    input wire [31:0] instr,
+    output wire [31:0] d_addr,
+    output wire [31:0] d_wdata,
+    input wire [31:0] d_rdata,
+    output wire d_we
 );
 
-    // -----------------------------
-    // State
-    // -----------------------------
-    reg [31:0] pc;
+    // --- Pipeline Registers ---
+    reg [31:0] if_id_instr;
+    reg [31:0] id_ex_instr, id_ex_reg_a, id_ex_reg_b;
+    reg [4:0]  id_ex_rs, id_ex_rt, id_ex_rd;
+    
+    reg [31:0] ex_mem_alu_res, ex_mem_reg_b;
+    reg [4:0]  ex_mem_rd;
+    reg        ex_mem_reg_write;
 
-    // Register file (EXPOSED FOR COCOTB)
-    reg [31:0] regfile [0:31];
+    reg [31:0] mem_wb_alu_res;
+    reg [4:0]  mem_wb_rd;
+    reg        mem_wb_reg_write;
 
-    // Instruction memory (loaded by cocotb)
-    reg [31:0] instr_mem [0:255];
+    // Register File
+    reg [31:0] rf [0:31];
 
-    // -----------------------------
-    // Instruction fields (MIPS-like)
-    // -----------------------------
-    wire [31:0] instr;
-    wire [5:0]  opcode;
-    wire [4:0]  rs, rt, rd;
-    wire [15:0] imm;
-
-    assign instr  = instr_mem[pc[9:2]];
-    assign opcode = instr[31:26];
-    assign rs     = instr[25:21];
-    assign rt     = instr[20:16];
-    assign rd     = instr[15:11];
-    assign imm    = instr[15:0];
-
-    // -----------------------------
-    // Immediate
-    // -----------------------------
-    wire [31:0] imm_ext = {{16{imm[15]}}, imm};
-
-    // -----------------------------
-    // Execute values
-    // -----------------------------
-    reg [31:0] alu_result;
-    reg        reg_write;
-    reg [4:0]  reg_dst;
-    reg [31:0] reg_wdata;
-
-    // -----------------------------
-    // Sequential logic
-    // -----------------------------
-    integer i;
-
-    always @(posedge clk) begin
-        if (reset) begin
-            pc <= 0;
-            for (i = 0; i < 32; i = i + 1)
-                regfile[i] <= 0;
-        end else begin
-            // -----------------------------
-            // Default
-            // -----------------------------
-            reg_write <= 0;
-            alu_result <= 0;
-            reg_dst <= 0;
-            reg_wdata <= 0;
-
-            // -----------------------------
-            // Decode + Execute
-            // -----------------------------
-            case (opcode)
-
-                // ADDI rt, rs, imm
-                6'b001000: begin
-                    alu_result = regfile[rs] + imm_ext;
-                    reg_dst    = rt;
-                    reg_wdata  = alu_result;
-                    reg_write  = 1;
-                end
-
-                // ADD rd, rs, rt
-                6'b000000: begin
-                    alu_result = regfile[rs] + regfile[rt];
-                    reg_dst    = rd;
-                    reg_wdata  = alu_result;
-                    reg_write  = 1;
-                end
-
-                // NOP / unsupported
-                default: begin
-                    reg_write = 0;
-                end
-            endcase
-
-            // -----------------------------
-            // Writeback
-            // -----------------------------
-            if (reg_write && reg_dst != 0) begin
-                regfile[reg_dst] <= reg_wdata;
-            end
-
-            // -----------------------------
-            // Next PC
-            // -----------------------------
-            pc <= pc + 4;
-        end
+    // --- IF Stage ---
+    always @(posedge clk or posedge rst) begin
+        if (rst) pc <= 0;
+        else     pc <= pc + 4;
     end
 
+    // --- ID Stage ---
+    always @(posedge clk) begin
+        if_id_instr <= instr;
+        id_ex_instr <= if_id_instr;
+        id_ex_reg_a <= rf[if_id_instr[25:21]];
+        id_ex_reg_b <= rf[if_id_instr[20:16]];
+        id_ex_rs    <= if_id_instr[25:21];
+        id_ex_rt    <= if_id_instr[20:16];
+        id_ex_rd    <= if_id_instr[15:11];
+    end
+
+    // --- EX Stage (Forwarding Logic) ---
+    wire [31:0] forward_a, forward_b;
+    
+    // Forwarding for Operand A
+    assign forward_a = (ex_mem_reg_write && (ex_mem_rd != 0) && (ex_mem_rd == id_ex_rs)) ? ex_mem_alu_res :
+                       (mem_wb_reg_write && (mem_wb_rd != 0) && (mem_wb_rd == id_ex_rs)) ? mem_wb_alu_res :
+                       id_ex_reg_a;
+
+    // Forwarding for Operand B
+    assign forward_b = (ex_mem_reg_write && (ex_mem_rd != 0) && (ex_mem_rd == id_ex_rt)) ? ex_mem_alu_res :
+                       (mem_wb_reg_write && (mem_wb_rd != 0) && (mem_wb_rd == id_ex_rt)) ? mem_wb_alu_res :
+                       id_ex_reg_b;
+
+    wire [31:0] alu_out = forward_a + forward_b; // Assume ADD
+
+    always @(posedge clk) begin
+        ex_mem_alu_res   <= alu_out;
+        ex_mem_reg_b     <= forward_b;
+        ex_mem_rd        <= id_ex_rd;
+        ex_mem_reg_write <= 1'b1;
+    end
+
+    // --- MEM Stage ---
+    assign d_addr = ex_mem_alu_res;
+    assign d_we   = 0; 
+
+    always @(posedge clk) begin
+        mem_wb_alu_res   <= ex_mem_alu_res;
+        mem_wb_rd        <= ex_mem_rd;
+        mem_wb_reg_write <= ex_mem_reg_write;
+    end
+
+    // --- WB Stage ---
+    always @(posedge clk) begin
+        if (mem_wb_reg_write && mem_wb_rd != 0)
+            rf[mem_wb_rd] <= mem_wb_alu_res;
+    end
 endmodule
