@@ -12,7 +12,8 @@ Interfaces: * Standard clk and rst inputs.
 			* Data memory interface (Address out, Write-Data out, Read-Data in, Write-Enable out).
 			
 
-Reset Logic: Ensure all pipeline registers and the Register File (32 entries) are explicitly initialized to zero on a synchronous reset to prevent X propagation in simulation.
+Reset Logic: Ensure all pipeline registers and the Register File (32 entries) are explicitly initialized to zero on a SYNCHRONOUS RESET to prevent X propagation in simulation.
+Implement the register file as a 32-element array named exactly `rf` (e.g. `reg [31:0] rf [0:31]`). The tests access `dut.rf[reg]`; any other name will cause failures.
 
 2. Instruction and Data Hazard Handling:
 
@@ -25,49 +26,3 @@ Reset Logic: Ensure all pipeline registers and the Register File (32 entries) ar
 3. Verification:
 
 Run the project's test suite to verify your design before submitting.
-
-4. Hints:
-
-When the instruction in decode reads rs or rt and the instruction in write-back writes that same register in the same cycle, the value used in decode must be the value being written in write-back.
-
-Implement explicit forwarding of the WB result into the ID stage: use the WB write data for rs_data/rt_data when mem_wb_reg_write is set and the WB destination register equals rs or rt (and is not R0).
-
-The test harness supplies the current instruction on the instr input each clock cycle (one instruction per cycle). The CPU must capture that value as the instruction for the current fetch and advance PC by 4 each cycle when not stalled. Do not assume instruction memory is external; instr is driven by the harness each cycle.
-
-Add a testbench case that exercises a dependency chain: e.g. with R1 and R2 pre-loaded, run ADD R3,R1,R2; ADD R4,R3,R1; ADD R5,R4,R3; ADD R6,R5,R0 (R0=0), then run at least 5 more cycles. Check that R3, R4, R5, R6 have the correct forwarded values. This matches the scenario used by the grading tests.
-
-Initialize all pipeline registers and the 32-entry register file to zero on synchronous reset. Ensure no path leaves pipeline or RF state undefined, or the grading test will see X/Z and fail.
-
-
-The grading harness pre-loads and reads registers by name. You must:
-
-- Implement the register file as a 32-element array named exactly `rf` (e.g. `reg [31:0] rf [0:31]`). The tests access `dut.rf[reg]`; any other name will cause failures.
-- On synchronous reset, initialize every pipeline register and every entry of `rf` to zero. If any pipeline or register output is left undefined (X or Z), the grading test will fail when it checks register values.
-
-The test harness does not provide an instruction memory. It drives the `instr` input directly each clock cycle:
-
-- Treat the value on `instr` as the instruction for the current fetch. Capture it into your IF/ID stage (e.g. `if_id_instr <= instr`) and advance PC by 4 each cycle when not stalled.
-- Do not assume instruction memory is external or that you must drive an address to get an instruction; the harness supplies the current instruction on `instr` every cycle.
-
-The grading tests use MIPS-style instruction encoding:
-
-- R-type format: opcode [31:26], rs [25:21], rt [20:16], rd [15:11], shamt [10:6], funct [5:0].
-- ADD: opcode = 6'b000000, funct = 6'b100000. Destination is rd. Example: ADD R3, R1, R2 is 0x00221820.
-- NOP is 0x00000000. R0 must always read as zero (do not write to R0, or ignore writes to R0).
-- Decode and execute according to this MIPS layout; a RISC-V or other encoding will fail the tests.
-
-Back-to-back dependent instructions must get correct operands via forwarding:
-
-- Forward from the EX/MEM stage into the EX stage: when the instruction in EX needs rs or rt and the instruction in EX/MEM writes that register, use the EX/MEM result (ALU result or, for a load, the loaded data—see Hint 6) as the operand in EX.
-- Forward from the MEM/WB stage into the EX stage: when the instruction in EX needs rs or rt and the instruction in MEM/WB writes that register (and EX/MEM does not), use the WB write data (ALU result or memory data) as the operand in EX.
-- Prioritize EX/MEM over MEM/WB when both write the same register. Without this, sequences like ADD R3,R1,R2; ADD R4,R3,R1; ADD R5,R4,R3 will produce wrong R3, R4, R5.
-
-When the instruction in the decode stage reads a register that the write-back stage writes in the same cycle, the value used in decode must be the value being written in WB:
-
-- If `mem_wb_reg_write` is set and the WB destination register equals rs or rt (and is not R0), use the WB write data (mem_to_reg ? memory_data : alu_result) as rs_data or rt_data in the ID stage instead of reading from the register file.
-- Without this, sequences like ADD R3,R1,R2 followed immediately by ADD R4,R3,R1 can use the old value of R3 and fail. The grading tests rely on this behavior.
-
-When the instruction in EX/MEM is a load (e.g. LW) and the instruction in EX needs that loaded register:
-
-- Forward the value read from memory (`d_rdata`) into the EX stage, not the address (`ex_mem_alu_result`). Otherwise the next instruction will use the load address as operand and produce wrong results.
-- The grading tests currently use only ADD and NOP, but your own testbench or future tests may use LW followed by a dependent instruction; implementing this forwarding avoids load-use failures.
