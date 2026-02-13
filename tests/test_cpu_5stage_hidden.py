@@ -88,6 +88,7 @@ def test_cpu_5stage_hidden_runner():
     
     runner.test(
         hdl_toplevel="cpu_5stage",
-        test_module="test_cpu_5stage_hidden"
-    )
-
+        test_module=Path(__file__).stem # Automatically uses the current filename
+   )
+if __name__ == "__main__":
+    test_cpu_5stage_hidden_runner()
