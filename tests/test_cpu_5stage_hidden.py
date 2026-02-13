@@ -75,9 +75,7 @@ def test_cpu_5stage_hidden_runner():
     sim = os.getenv("SIM", "icarus")
     proj_path = Path(__file__).resolve().parent.parent
     
-    sources = [
-        proj_path / "sources/cpu_5stage.sv",
-    ]
+    sources = [proj_path / "sources/cpu_5stage.sv"]
     
     runner = get_runner(sim)
     runner.build(
@@ -88,7 +86,7 @@ def test_cpu_5stage_hidden_runner():
     
     runner.test(
         hdl_toplevel="cpu_5stage",
-        test_module=Path(__file__).stem # Automatically uses the current filename
+        test_module="test_cpu_5stage_hidden",
    )
 if __name__ == "__main__":
     test_cpu_5stage_hidden_runner()
