@@ -3,8 +3,6 @@ Objective: Generate a synthesizable Verilog implementation of a 5-stage pipeline
 
 1. RTL Architecture Requirements:
 
-Pipeline Stages: Implement five distinct stages: IF (Instruction Fetch), ID (Instruction Decode), EX (Execute), MEM (Memory Access), and WB (Write Back).
-
 Interfaces: * Standard clk and rst inputs.
 
 			* Instruction memory interface (Program Counter Address out, Instruction in).
@@ -12,9 +10,8 @@ Interfaces: * Standard clk and rst inputs.
 			* Data memory interface (Address out, Write-Data out, Read-Data in, Write-Enable out).
 			
 
-Reset Logic: Ensure all pipeline registers and the Register File (32 entries) are explicitly initialized to zero on a SYNCHRONOUS RESET to prevent X propagation in simulation.
 Implement the register file as a 32-element array named exactly `rf` (e.g. `reg [31:0] rf [0:31]`). The tests access `dut.rf[reg]`; any other name will cause failures.
 
 2. Instruction and Data Hazard Handling:
 
-* The test harness supplies the current instruction on the `instr` input each clock cycle (one instruction per cycle). The CPU must use the value on `instr` as the instruction for the current fetch and advance the PC each cycle when not stalled.
+* The test harness supplies the current instruction on the `instr` input each clock cycle.
