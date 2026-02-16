@@ -22,7 +22,3 @@ Implement the register file as a 32-element array named exactly `rf` (e.g. `reg 
 * Data hazards: Implement forwarding so that back-to-back dependent instructions produce correct results. In particular:
   - Forward from the EX/MEM stage and from the MEM/WB stage into the EX stage when the instruction in EX needs a operand produced by a previous instruction.
   - Resolve the same-cycle read-after-write case: when the Write Back stage writes a register and the Decode stage reads that same register in the same cycle, the value read in ID must be the value being written in WB (e.g. forward the WB result into the ID stage for rs/rt when mem_wb_reg_write and the destination register equals rs or rt). Without this, sequences like ADD R3,R1,R2 followed by ADD R4,R3,R1 will produce wrong results.
-
-3. Verification:
-
-Run the project's test suite to verify your design before submitting.
