@@ -98,7 +98,7 @@ module cpu_5stage (
     end
 
     // ALU Logic
-	wire alu_out;
+	wire alu_out=0;
     always @(*) begin
         // For LW/SW/ADDI we use fwd_a + imm. For R-type ADD, we use fwd_a + fwd_b
         if (id_ex_instr[31:26] == 6'h0) 
