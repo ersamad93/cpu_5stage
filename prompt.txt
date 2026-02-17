@@ -10,4 +10,5 @@ Interfaces: * Standard clk and rst inputs.
 			* Data memory interface (Address out, Write-Data out, Read-Data in, Write-Enable out).
 			
 
-Implement the register file as a 32-element array named exactly `rf` (e.g. `reg [31:0] rf [0:31]`). The tests access `dut.rf[reg]`; any other name will cause failures.
+Implement the register file as a 32-element array named exactly `rf` (e.g. `reg [31:0] rf [0:31]`).
+
