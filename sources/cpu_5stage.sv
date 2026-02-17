@@ -15,7 +15,7 @@ module cpu_5stage (
 
     // --- Internal Registers ---
     reg [31:0] if_id_instr;
-    reg [31:0] id_ex_instr, id_ex_reg_a, id_ex_reg_b, id_ex_imm;
+    reg [31:0] id_ex_instr, id_ex_reg_a, id_ex_reg_b, id_ex_imm, id_ex_reg_write;
     reg [4:0]  id_ex_rs, id_ex_rt, id_ex_rd;
     reg [31:0] ex_mem_alu_res, ex_mem_reg_b, ex_mem_instr;
     reg [4:0]  ex_mem_rd;
