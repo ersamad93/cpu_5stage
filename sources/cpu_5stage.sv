@@ -15,11 +15,11 @@ module cpu_5stage (
 
     // --- Internal Registers ---
     reg [31:0] if_id_instr;
-    reg [31:0] id_ex_instr, id_ex_reg_a, id_ex_reg_b, id_ex_imm, id_ex_reg_write;
+    reg [31:0] id_ex_instr, id_ex_reg_a, id_ex_reg_b, id_ex_imm;
     reg [4:0]  id_ex_rs, id_ex_rt, id_ex_rd;
     reg [31:0] ex_mem_alu_res, ex_mem_reg_b, ex_mem_instr;
     reg [4:0]  ex_mem_rd;
-    reg        ex_mem_reg_write;
+    reg        ex_mem_reg_write, id_ex_reg_write;
     reg [31:0] mem_wb_alu_res, mem_wb_mem_data, mem_wb_instr;
     reg [4:0]  mem_wb_rd;
     reg        mem_wb_reg_write;
@@ -55,7 +55,7 @@ module cpu_5stage (
     wire [31:0] rf_data_b = (rt == 0) ? 32'h0 : rf[rt];
 
     always @(posedge clk or posedge rst) begin
-        if (rst || load_use_stall) begin
+        if (rst) begin
 			id_ex_instr     <= 32'h0;
             id_ex_reg_write <= 1'b0;
             id_ex_rd        <= 5'b0;
@@ -64,6 +64,12 @@ module cpu_5stage (
             id_ex_reg_a     <= 32'h0;
             id_ex_reg_b     <= 32'h0;
             id_ex_imm       <= 32'h0;
+		end else if (load_use_stall) begin
+        // INJECT BUBBLE: Turn the EX stage into a NOP
+        id_ex_instr     <= 32'h0; 
+        id_ex_reg_write <= 1'b0;
+        // IMPORTANT: Do NOT change if_id_instr here! 
+        // It must stay 'ADD R4, R3, R3' so it can try again next cycle.
         end else begin
 			id_ex_instr     <= if_id_instr;
             id_ex_reg_a     <= rf_data_a;
@@ -76,6 +82,7 @@ module cpu_5stage (
             id_ex_reg_write <= (opcode == 6'h00 || opcode == 6'h08 || opcode == 6'h23);
         end
     end
+    wire [31:0] wb_data = (mem_wb_instr[31:26] == 6'h23) ? mem_wb_mem_data : mem_wb_alu_res;
 
 // --- EX Stage Forwarding Logic ---
     reg [31:0] fwd_a, fwd_b;
@@ -116,7 +123,8 @@ module cpu_5stage (
             ex_mem_reg_b   <= fwd_b; // Corner Case 4: SW Forwarding
             ex_mem_instr   <= id_ex_instr;
             ex_mem_rd      <= id_ex_rd;
-            ex_mem_reg_write <= (id_ex_instr != 0 && id_ex_instr[31:26] != 6'h2b); // No write for SW or NOP
+            ex_mem_reg_write <= id_ex_reg_write;
+//			ex_mem_reg_write <= (id_ex_instr != 0 && id_ex_instr[31:26] != 6'h2b); // No write for SW or NOP
         end
     end
 
@@ -141,7 +149,6 @@ module cpu_5stage (
     end
 
     // --- WB Stage (Corner Case 3: R0 Immortality) ---
-    wire [31:0] wb_data = (mem_wb_instr[31:26] == 6'h23) ? mem_wb_mem_data : mem_wb_alu_res;
     integer i;
     always @(posedge clk or posedge rst) begin
         if (rst) for (i=0; i<32; i=i+1) rf[i] <= 0;
